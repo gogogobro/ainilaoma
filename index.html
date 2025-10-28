@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>爱心动画</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: black;
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
+  }
+  canvas {
+    display: block;
+  }
+  #label {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #FF99CC;
+    font-family: Helvetica, sans-serif;
+    font-size: 30px;
+    font-weight: bold;
+    pointer-events: none;
+  }
+  #playHint {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: white;
+    font-family: Helvetica, sans-serif;
+    font-size: 18px;
+    background: rgba(0,0,0,0.5);
+    padding: 5px 10px;
+    border-radius: 5px;
+  }
+</style>
+</head>
+<body>
+<canvas id="heartCanvas"></canvas>
+<div id="label">爱你老妈</div>
+<div id="playHint">点击或触摸屏幕播放背景音乐</div>
+<audio id="bgMusic" src="./Bad Girl.mp3" loop></audio> <!-- 替换成你的音乐文件路径 -->
+
+<script>
+const canvas = document.getElementById('heartCanvas');
+const ctx = canvas.getContext('2d');
+
+let width = window.innerWidth;
+let height = window.innerHeight;
+canvas.width = width;
+canvas.height = height;
+
+const CANVAS_CENTER_X = width / 2;
+const CANVAS_CENTER_Y = height / 2;
+const HEART_COLOR = "#FF99CC";
+
+// 心形函数
+function heartFunction(t, shrink = 11) {
+    let x = 16 * Math.pow(Math.sin(t), 3);
+    let y = -(13 * Math.cos(t) - 5*Math.cos(2*t) - 2*Math.cos(3*t) - Math.cos(4*t));
+    x = x * shrink + CANVAS_CENTER_X;
+    y = y * shrink + CANVAS_CENTER_Y;
+    return [x, y];
+}
+
+// 随机散点
+function scatterInside(x, y, beta=0.15) {
+    let ratioX = -beta * Math.log(Math.random());
+    let ratioY = -beta * Math.log(Math.random());
+    let dx = ratioX * (x - CANVAS_CENTER_X);
+    let dy = ratioY * (y - CANVAS_CENTER_Y);
+    return [x - dx, y - dy];
+}
+
+// 曲线函数
+function curve(p){
+    return 2 * (2*Math.sin(4*p)) / (2*Math.PI);
+}
+
+// 粒子数组
+let points = [];
+let edgePoints = [];
+let centerPoints = [];
+let allFrames = [];
+const FRAME_COUNT = 20;
+
+// 生成基础点
+for(let i=0; i<2000; i++){
+    let t = Math.random() * 2*Math.PI;
+    let [x, y] = heartFunction(t);
+    points.push([x, y]);
+}
+
+// 爱心边缘扩散
+for(let p of points){
+    for(let i=0;i<3;i++){
+        edgePoints.push(scatterInside(p[0], p[1], 0.05));
+    }
+}
+
+// 中心扩散
+for(let i=0;i<4000;i++){
+    let p = points[Math.floor(Math.random()*points.length)];
+    centerPoints.push(scatterInside(p[0], p[1], 0.17));
+}
+
+// 生成每帧粒子
+function generateFrames(){
+    for(let frame=0; frame<FRAME_COUNT; frame++){
+        let ratio = 10 * curve(frame/20 * Math.PI); // 减慢跳动速度
+        let allPoints = [];
+        
+        // 光环
+        let haloNumber = Math.floor(3000 + 4000*Math.abs(curve(frame/20*Math.PI)**2));
+        for(let i=0;i<haloNumber;i++){
+            let t = Math.random() * 2*Math.PI;
+            let [x, y] = heartFunction(t, 11.6);
+            let force = -1 / Math.pow(Math.pow(x-CANVAS_CENTER_X,2)+Math.pow(y-CANVAS_CENTER_Y,2), 0.6);
+            x -= ratio * force * (x-CANVAS_CENTER_X) + (Math.random()*2-1);
+            y -= ratio * force * (y-CANVAS_CENTER_Y) + (Math.random()*2-1);
+            x += Math.random()*28-14;
+            y += Math.random()*28-14;
+            let size = Math.random()<0.66?2:1;
+            allPoints.push([x, y, size]);
+        }
+
+        // 轮廓
+        for(let p of points){
+            let force = 1 / Math.pow(Math.pow(p[0]-CANVAS_CENTER_X,2)+Math.pow(p[1]-CANVAS_CENTER_Y,2), 0.520);
+            let x = p[0] - ratio * force * (p[0]-CANVAS_CENTER_X) + (Math.random()*2-1);
+            let y = p[1] - ratio * force * (p[1]-CANVAS_CENTER_Y) + (Math.random()*2-1);
+            let size = Math.floor(Math.random()*3)+1;
+            allPoints.push([x, y, size]);
+        }
+
+        // 边缘
+        for(let p of edgePoints){
+            let force = 1 / Math.pow(Math.pow(p[0]-CANVAS_CENTER_X,2)+Math.pow(p[1]-CANVAS_CENTER_Y,2), 0.520);
+            let x = p[0] - ratio * force * (p[0]-CANVAS_CENTER_X) + (Math.random()*2-1);
+            let y = p[1] - ratio * force * (p[1]-CANVAS_CENTER_Y) + (Math.random()*2-1);
+            let size = Math.floor(Math.random()*2)+1;
+            allPoints.push([x, y, size]);
+        }
+
+        // 中心
+        for(let p of centerPoints){
+            let force = 1 / Math.pow(Math.pow(p[0]-CANVAS_CENTER_X,2)+Math.pow(p[1]-CANVAS_CENTER_Y,2), 0.520);
+            let x = p[0] - ratio * force * (p[0]-CANVAS_CENTER_X) + (Math.random()*2-1);
+            let y = p[1] - ratio * force * (p[1]-CANVAS_CENTER_Y) + (Math.random()*2-1);
+            let size = Math.floor(Math.random()*2)+1;
+            allPoints.push([x, y, size]);
+        }
+
+        allFrames.push(allPoints);
+    }
+}
+generateFrames();
+
+// 渲染动画
+let frameIndex = 0;
+let frameDelay = 5; // 每帧显示次数，动画更慢
+let counter = 0;
+
+function drawFrame(){
+    ctx.clearRect(0,0,width,height);
+    let frame = allFrames[frameIndex % FRAME_COUNT];
+    for(let p of frame){
+        ctx.fillStyle = HEART_COLOR;
+        ctx.fillRect(p[0], p[1], p[2], p[2]);
+    }
+
+    counter++;
+    if(counter >= frameDelay){
+        frameIndex++;
+        counter = 0;
+    }
+
+    requestAnimationFrame(drawFrame);
+}
+drawFrame();
+
+// 音乐触发播放
+const audio = document.getElementById("bgMusic");
+function playMusicOnce() {
+    audio.play().catch(e => console.log("播放被阻止:", e));
+    document.getElementById('playHint').style.display = 'none'; // 隐藏提示
+    document.body.removeEventListener("click", playMusicOnce);
+    document.body.removeEventListener("touchstart", playMusicOnce);
+}
+document.body.addEventListener("click", playMusicOnce);
+document.body.addEventListener("touchstart", playMusicOnce);
+
+// 窗口大小变化自动适应
+window.addEventListener('resize', ()=>{
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width;
+    canvas.height = height;
+});
+</script>
+</body>
+</html>
